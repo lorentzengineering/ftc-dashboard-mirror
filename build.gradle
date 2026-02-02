@@ -32,3 +32,20 @@ allprojects {
 repositories {
     mavenCentral()
 }
+
+subprojects { proj ->
+    proj.plugins.withId("maven-publish") {
+        proj.publishing {
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/lorentzengineering/ftc-dashboard-mirror")
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR")
+                        password = System.getenv("GITHUB_TOKEN")
+                    }
+                }
+            }
+        }
+    }
+}
