@@ -1,0 +1,79 @@
+name: Sync upstream and publish (daily)
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  sync_publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Upstream docs mention Node is required and they use Node 18.12.1 in Gradle builds
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.12.1"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+
+      - name: Fetch upstream and detect changes
+        run: |
+          set -e
+          git remote add upstream https://github.com/acmerobotics/ftc-dashboard.git || true
+          git fetch upstream master
+
+          UPSTREAM_SHA=$(git rev-parse upstream/master)
+          CURRENT_SHA=$(git rev-parse HEAD)
+
+          echo "UPSTREAM_SHA=$UPSTREAM_SHA" >> $GITHUB_ENV
+          echo "CURRENT_SHA=$CURRENT_SHA" >> $GITHUB_ENV
+
+          if [ "$UPSTREAM_SHA" = "$CURRENT_SHA" ]; then
+            echo "NO_CHANGES=true" >> $GITHUB_ENV
+          fi
+
+      - name: Fast-forward mirror to upstream
+        if: env.NO_CHANGES != 'true'
+        run: |
+          set -e
+          git merge --ff-only "$UPSTREAM_SHA"
+          git push origin HEAD
+
+      - name: Compute version
+        if: env.NO_CHANGES != 'true'
+        run: |
+          set -e
+          SHORT=$(echo "$UPSTREAM_SHA" | cut -c1-7)
+          TS=$(date -u +"%Y%m%d.%H%M")
+          echo "DASH_VERSION=${TS}-${SHORT}" >> $GITHUB_ENV
+
+      # Optional but often helps npm reliability by priming deps once:
+      - name: Install client deps
+        if: env.NO_CHANGES != 'true'
+        run: |
+          set -e
+          npm ci
+
+      - name: Set dashboard version in Gradle
+        if: env.NO_CHANGES != 'true'
+        run: |
+          set -e
+          # FTC Dashboard docs reference ext.dashboard_version in FtcDashboard/build.gradle
+          # We'll overwrite it each publish so versions are unique.
+          sed -i -E "s/(ext\\.dashboard_version\\s*=\\s*\")[^\"]+(\")/\\1${DASH_VERSION}\\2/" FtcDashboard/build.gradle
+
+      - name: Publish to GitHub Packages
+        if: env.NO_CHANGES != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./gradlew publish --stacktrace
