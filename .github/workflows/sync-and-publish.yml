@@ -69,7 +69,7 @@ jobs:
           set -e
           # FTC Dashboard docs reference ext.dashboard_version in FtcDashboard/build.gradle
           # We'll overwrite it each publish so versions are unique.
-          sed -i -E "s/(ext\\.dashboard_version\\s*=\\s*\")[^\"]+(\")/\\1${DASH_VERSION}\\2/" FtcDashboard/build.gradle
+          sed -i -E "s/(ext\\.dashboard_version\\s*=\\s*\")[^\"]+(\")/\\1${DASH_VERSION}\\2/" build.gradle
 
       - name: Publish to GitHub Packages
         if: env.NO_CHANGES != 'true'
