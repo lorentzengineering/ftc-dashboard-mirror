@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: "18.12.1"
           cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          
 
       - name: Fetch upstream and detect changes
         run: |
@@ -61,7 +61,7 @@ jobs:
         if: env.NO_CHANGES != 'true'
         run: |
           set -e
-          npm ci
+          npm install -g yarn
 
       - name: Set dashboard version in Gradle
         if: env.NO_CHANGES != 'true'
